@@ -519,7 +519,7 @@ github.com/MaweySB02
 linkedin.com/in/mawey-bacelonia-120a05350
 
 %s
-maweysb@gmail.com
+msbwor02@gmail.com
 
 %s
 Working on it!
