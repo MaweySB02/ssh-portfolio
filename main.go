@@ -2,10 +2,23 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
+
+func main() {
+	p := tea.NewProgram(
+		initialModel(),
+		tea.WithAltScreen(),
+	)
+
+	if _, err := p.Run(); err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+}
 
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -101,6 +114,9 @@ const (
 type model struct {
 	cursor int
 	screen screen
+
+	width  int
+	height int
 }
 
 var menuItems = []string{
@@ -125,6 +141,10 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 
 	case tea.KeyMsg:
 
@@ -189,26 +209,42 @@ func (m model) View() string {
 	switch m.screen {
 
 	case aboutScreen:
-		return pageLayout(aboutView())
+		return pageLayout(aboutView(), m.width)
 
 	case projectsScreen:
-		return pageLayout(projectsView())
+		return pageLayout(projectsView(), m.width)
 
 	case skillsScreen:
-		return pageLayout(skillsView())
+		return pageLayout(skillsView(), m.width)
 
 	case experienceScreen:
-		return pageLayout(experienceView())
+		return pageLayout(experienceView(), m.width)
 
 	case contactScreen:
-		return pageLayout(contactView())
+		return pageLayout(contactView(), m.width)
 
 	default:
-		return pageLayout(menuView(m))
+		return pageLayout(menuView(m), m.width)
 	}
 }
 
-func pageLayout(content string) string {
+func pageLayout(content string, terminalWidth int) string {
+
+	// ≥ 120: Full layout
+	if terminalWidth >= 120 {
+		return fullLayout(content)
+	}
+
+	// 80–119: Stacked layout
+	if terminalWidth >= 80 {
+		return stackedLayout(content)
+	}
+
+	// < 80: Compact layout
+	return compactLayout(content, terminalWidth)
+}
+
+func fullLayout(content string) string {
 
 	// LEFT: permanent face
 	left := asciiFaceStyle.Render(asciiArtFace)
@@ -219,15 +255,17 @@ func pageLayout(content string) string {
 	// BOTTOM RIGHT: current page
 	right := boxStyle.Render(content)
 
-	// Stack MAWEY ascii and content vertically
+	// Stack MAWEY and content
 	rightColumn := lipgloss.JoinVertical(
 		lipgloss.Left,
 		maweyBox,
 		right,
 	)
 
-	// Put face beside the right column
-	gap := lipgloss.NewStyle().Width(2).Render("")
+	// Space between portrait and right column
+	gap := lipgloss.NewStyle().
+		Width(2).
+		Render("")
 
 	return lipgloss.JoinHorizontal(
 		lipgloss.Top,
@@ -235,6 +273,36 @@ func pageLayout(content string) string {
 		gap,
 		rightColumn,
 	)
+}
+
+func stackedLayout(content string) string {
+
+	maweyBox := asciiTextStyle.Render(asciiArtText)
+
+	right := boxStyle.Render(content)
+
+	return lipgloss.JoinVertical(
+		lipgloss.Center,
+		maweyBox,
+		right,
+	)
+}
+
+func compactLayout(content string, terminalWidth int) string {
+
+	width := terminalWidth - 4
+
+	if width < 20 {
+		width = 20
+	}
+
+	compactBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#8A583C")).
+		Padding(1, 2).
+		Width(width)
+
+	return compactBox.Render(content)
 }
 
 func menuView(m model) string {
@@ -467,13 +535,4 @@ Working on it!
 	)
 
 	return title + "\n" + content + help
-}
-
-func main() {
-
-	p := tea.NewProgram(initialModel())
-
-	if _, err := p.Run(); err != nil {
-		panic(err)
-	}
 }
