@@ -100,6 +100,40 @@ var asciiArtFace = `
 -.                ......:-----::.                  .-=======
 `
 
+var asciiArtFaceLight = `
+-----------------------==********++++======-----------------
+-------------------=#%@@@@@@@@@@@@@@@@%*+====---------------
+----------------=*@@@@@@@@@@@@@@@@@@@@@@@%+=====------------
+---------------=%@@@@@@@@@@@@@@@@@@@@@@@@@@#=======---------
+-------------=+@@@@@@@@@@@@@@@@@@@@@%@@@@@@@%++======-------
+------------=+@@@@@@@@@@@@@@@@@@@@@@&&@@@@@@@@*========-----
+-----------==@@@@@@@@@@@@@@@@@@@@&&%###&&@@@@@@#=========---
+----------==@@@@@@@@@@@@@@@@@@@%#+++++++**#%@@@@+=========--
+---------==#@@@@@@@@@@@@@@@@@@#*+====+++++**%@@@@===========
+------==-=+@@@@@@@@@@@@@@@@@@#*+========++++*%@@@#==========
+------====%@@@@@@@@@@@@@@@@@#++===========+++*%@@@==========
+-----====#@@@@@@@@@@@@@@@@%****+++========++++*@@@#=========
+----====*@@@@@@@@@@@@@@@%*+++++*****+=++++*####%@@@+========
+--======%@@@@@@@@@@@@@#***#&&&&%#***++++*******#@@@%========
+-======+@@@@@@@@@@@%*++++*##%&++#%++==+**%@@+*%@@@@@%=======
+=======#@@@@@@@@@@#**+++=====++++=====+**++++++*@@@@@+======
+======+@@@@@@@@@@@#**++=============++++++++==++*@@@@+======
+======+@@@@@@@@@@%&#*+++==========++*++++++===++*@@@@+======
+=====+%@@@@@@@@@@@%#*+++========++++=+++++++==++#@@@@+======
+=====*@@@@@@@@@@@@%#**+++========+******#*++=+++@@@@++======
+=====#@@@@@@@@@@@@@#**++++++++=======+=++++++++@@@@#++======
+====+%@@@@@@@@@@@@@@#*++++++++++++*******++++*@@@@@#++======
+====*%@@@@@@@@@@@@@@%#**++++++++##**######*+*@@@@@@#+++=====
+===+%@@@@@@@@@@@@@@%&&&#***++++++++*****+++#@@@@@@@%++++====
+==+*%@@@@@@@@@@@@@@%######*++++++++++++++*@@@@@@@@@#+++++===
+==+*@@@@@@@@@@@@@@%&########**++++++++++*@@@@@@@@@@*+++++===
+==*@@@@@@@@@@@@@@%&##******#####**+++*#@@@@@@@@@@@@#+++++===
+=*%@@@@@@@@@@@@@@%#**********###@@@@@@@@@@@@@@@@@@@#++++++==
+=#%@@@@@@@@@@@@@@@@@#********###%@@@@@@@@@@@@@@@@@@%*++++++=
+*%@@@@@@@@@@@@@@@@&&&&&%#*****##%@@@@@@@@@@@@@@@@@@%*+++++++
+
+`
+
 type screen int
 
 const (
@@ -111,9 +145,18 @@ const (
 	contactScreen
 )
 
+type Theme int
+
+const (
+	DarkTheme Theme = iota
+	LightTheme
+)
+
 type model struct {
 	cursor int
 	screen screen
+	page   string
+	theme  Theme
 
 	width  int
 	height int
@@ -131,6 +174,7 @@ func initialModel() model {
 	return model{
 		cursor: 0,
 		screen: menuScreen,
+		theme:  DarkTheme,
 	}
 }
 
@@ -153,6 +197,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Quit from anywhere
 		if key == "q" || key == "ctrl+c" {
 			return m, tea.Quit
+		}
+
+		// Toggle theme from anywhere
+		if key == "t" {
+			if m.theme == DarkTheme {
+				m.theme = LightTheme
+			} else {
+				m.theme = DarkTheme
+			}
+
+			return m, nil
 		}
 
 		// If we're on a portfolio page
@@ -209,30 +264,30 @@ func (m model) View() string {
 	switch m.screen {
 
 	case aboutScreen:
-		return pageLayout(aboutView(), m.width)
+		return pageLayout(aboutView(), m.width, m.theme)
 
 	case projectsScreen:
-		return pageLayout(projectsView(), m.width)
+		return pageLayout(projectsView(), m.width, m.theme)
 
 	case skillsScreen:
-		return pageLayout(skillsView(), m.width)
+		return pageLayout(skillsView(), m.width, m.theme)
 
 	case experienceScreen:
-		return pageLayout(experienceView(), m.width)
+		return pageLayout(experienceView(), m.width, m.theme)
 
 	case contactScreen:
-		return pageLayout(contactView(), m.width)
+		return pageLayout(contactView(), m.width, m.theme)
 
 	default:
-		return pageLayout(menuView(m), m.width)
+		return pageLayout(menuView(m), m.width, m.theme)
 	}
 }
 
-func pageLayout(content string, terminalWidth int) string {
+func pageLayout(content string, terminalWidth int, theme Theme) string {
 
 	// ≥ 120: Full layout
 	if terminalWidth >= 120 {
-		return fullLayout(content)
+		return fullLayout(content, theme)
 	}
 
 	// 80–119: Stacked layout
@@ -244,10 +299,16 @@ func pageLayout(content string, terminalWidth int) string {
 	return compactLayout(content, terminalWidth)
 }
 
-func fullLayout(content string) string {
+func fullLayout(content string, theme Theme) string {
 
 	// LEFT: permanent face
-	left := asciiFaceStyle.Render(asciiArtFace)
+	face := asciiArtFace
+
+	if theme == LightTheme {
+		face = asciiArtFaceLight
+	}
+
+	left := asciiFaceStyle.Render(face)
 
 	// TOP RIGHT: permanent MAWEY logo
 	maweyBox := asciiTextStyle.Render(asciiArtText)
@@ -333,8 +394,16 @@ func menuView(m model) string {
 		menu += "\n"
 	}
 
+	themeName := "Dark Theme"
+
+	if m.theme == LightTheme {
+		themeName = "Light Theme"
+	}
+
+	theme := itemStyle.Render("   Theme: " + themeName)
+
 	help := helpStyle.Render(
-		"↑/↓ or j/k navigate • enter select • q quit",
+		"↑/↓ or j/k navigate • t theme • enter select • q quit",
 	)
 
 	return name +
@@ -343,6 +412,8 @@ func menuView(m model) string {
 		"\n\n" +
 		menu +
 		"\n" +
+		theme +
+		"\n\n" +
 		help
 }
 
