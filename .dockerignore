@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+.vscode
+.idea
+
+README.md
+
+*.pem
+*.key
+id_rsa
+id_ed25519
